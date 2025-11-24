@@ -9,6 +9,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -17,12 +18,13 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity
-public class VerifToken {
+@Table(name = "tokens")
+public class Token {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private String token;
+    private String code;
     private Date expirationTime;
     private static final int EXPIRATION_TIME = 15;
 
@@ -30,16 +32,16 @@ public class VerifToken {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    public VerifToken(String token, User user) {
+    public Token(String code, User user) {
         super();
-        this.token = token;
+        this.code = code;
         this.user = user;
         this.expirationTime = this.getTokenExpirationTime();
     }
 
-    public VerifToken(String token) {
+    public Token(String code) {
         super();
-        this.token = token;
+        this.code = code;
         this.expirationTime = this.getTokenExpirationTime();
     }
 

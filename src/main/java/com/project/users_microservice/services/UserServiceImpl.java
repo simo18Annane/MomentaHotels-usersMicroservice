@@ -9,14 +9,14 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.project.users_microservice.entities.User;
-import com.project.users_microservice.entities.VerifToken;
+import com.project.users_microservice.entities.Token;
 import com.project.users_microservice.exceptions.EmailAlreadyExistsException;
 import com.project.users_microservice.exceptions.ExpiredTokenException;
 import com.project.users_microservice.exceptions.InvalidTokenException;
 import com.project.users_microservice.register.EmailSender;
 import com.project.users_microservice.register.RegistrationRequest;
 import com.project.users_microservice.repositories.UserRepository;
-import com.project.users_microservice.repositories.VerifTokenRepository;
+import com.project.users_microservice.repositories.TokenRepository;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -28,7 +28,7 @@ public class UserServiceImpl implements UserService {
     BCryptPasswordEncoder passwordEncoder;
 
     @Autowired
-    VerifTokenRepository verifTokenRepository;
+    TokenRepository tokenRepository;
 
     @Autowired
     EmailSender emailSender;
@@ -51,14 +51,15 @@ public class UserServiceImpl implements UserService {
         newUser.setRole(User.RoleType.CUSTOMER);
         User savedUser = userRepository.save(newUser);
 
-        String token = generateToken();
-        VerifToken verifToken = new VerifToken(token, savedUser);
-        verifTokenRepository.save(verifToken);
+        String code = generateCode();
+        Token token = new Token(code, savedUser);
+        tokenRepository.save(token);
 
         String emailBody = "<p>Dear " + savedUser.getFirstname() + ",</p>"
                 + "<p>Thank you for registering. Please use the following token to verify your email address:</p>"
-                + "<h3>" + token + "</h3>"
-                + "<p>Best regards,<br/>Momenta Hotels Team</p>";
+                + "<h3>" + code + "</h3>"
+                + "<p>Best regards,<br/>Momenta Hotels Team</p>"
+                + "<img src='cid:MomentaHotelsLogo' alt='Momenta Hotels Logo' width='200'/>";
 
         emailSender.sendEmail(savedUser.getEmail(), emailBody);
         
@@ -84,27 +85,30 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public User validateToken(String token) {
-        VerifToken verifToken = verifTokenRepository.findByToken(token);
-        if (verifToken == null) {
+    public User validateToken(String code) {
+        Token token = tokenRepository.findByCode(code);
+        if (token == null) {
             throw new InvalidTokenException("Invalid Token");
         }
-
-        User user = verifToken.getUser();
+        
         Calendar calendar = Calendar.getInstance();
-        if ((verifToken.getExpirationTime().getTime() - calendar.getTime().getTime()) <= 0) {
-            verifTokenRepository.delete(verifToken);
+        if ((token.getExpirationTime().getTime() - calendar.getTime().getTime()) <= 0) {
+            tokenRepository.delete(token);
             throw new ExpiredTokenException("Token has expired");
         }
 
+        User user = token.getUser();
         user.setEnabled(true);
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+        tokenRepository.delete(token);
+        
+        return savedUser;
     }
 
-    public String generateToken() {
+    public String generateCode() {
         Random random = new Random();
-        Integer token = 100000 + random.nextInt(900000);
-        return token.toString();
+        Integer code = 100000 + random.nextInt(900000);
+        return code.toString();
     }
 
 }

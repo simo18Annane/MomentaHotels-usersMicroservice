@@ -9,6 +9,6 @@ public interface UserService {
     User updateUser(User user);
     User getUserById(Long id);
     User getUserByEmail(String email);
-    User validateToken(String token);
+    User validateToken(String code);
 
 }
