@@ -23,7 +23,7 @@ public class EmailService implements EmailSender {
             helper.setText(body, true);
             helper.setTo(to);
             helper.setSubject("Confirm your email");
-            helper.setFrom("*******");
+            helper.setFrom("******");
             helper.addInline("MomentaHotelsLogo", new ClassPathResource("static/images/MomentaHotels.png"));
             mailSender.send(mimeMessage);
         } catch (MessagingException e) {

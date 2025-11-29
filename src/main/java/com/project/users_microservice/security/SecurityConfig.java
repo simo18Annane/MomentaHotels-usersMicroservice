@@ -47,7 +47,7 @@ public class SecurityConfig {
             }))
 
             .authorizeHttpRequests(requests -> requests
-                .requestMatchers("/login", "/register/**", "/verifyEmail/**").permitAll() //autoriser sans authentication; permitAll() ne veut pas dire pas de filtre, ça veut dire pas besoin d'utilisateur authentifié.
+                .requestMatchers("/login", "/register", "/checkToken").permitAll() //autoriser sans authentication; permitAll() ne veut pas dire pas de filtre, ça veut dire pas besoin d'utilisateur authentifié.
                 .anyRequest().authenticated()) //authentication obligatoire, donc JWT nécessaire.
             .addFilterBefore(new JWTAuthenticationFilter(authenticationManager), UsernamePasswordAuthenticationFilter.class)//ajout du filtre d'authentification avant celui de Spring Security
             .addFilterBefore(new JWTAuthorizationFilter(), UsernamePasswordAuthenticationFilter.class); //ajout du filtre d'autorisation avant celui de Spring Security, pour recupérer le token à chaque requête, le decoder et créer l'objet Authentication
