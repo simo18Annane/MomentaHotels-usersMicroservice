@@ -29,18 +29,19 @@ import jakarta.servlet.http.HttpServletResponse;
 
 public class JWTAuthenticationFilter extends UsernamePasswordAuthenticationFilter{
 
-    private AuthenticationManager authenticationManager;
+    private AuthenticationManager authenticationManager; //c'est l'objet central de Spring Security qui gère l'authentification en général via un UserDetailsService et un PasswordEncoder
 
     public JWTAuthenticationFilter(AuthenticationManager authenticationManager) {
         super();
         this.authenticationManager = authenticationManager;
     }
 
+    //attemptAuthentication : méthode appelée quand l'utilisateur essaie de se loguer, il transforme le json token Spring Security et laisse Spring vérifier les identifiants
     @Override
     public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response) throws AuthenticationException {
         User user = null;
         try {
-            user = new ObjectMapper().readValue(request.getInputStream(), User.class);
+            user = new ObjectMapper().readValue(request.getInputStream(), User.class); //pour déserialiser le json reçu en objet User
         } catch (JsonParseException e) {
             e.printStackTrace();
         } catch (JsonMappingException e) {
@@ -49,8 +50,12 @@ public class JWTAuthenticationFilter extends UsernamePasswordAuthenticationFilte
             e.printStackTrace();
         }
         return authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(user.getEmail(), user.getPassword()));
+        /*- Spring Security va utiliser le UserDetailsService et le PasswordEncoder configurés pour vérifier les identifiants 
+        - si ok, retourne un objet Authentication 
+        - sinon, lance une AuthenticationException qui ira dans unsuccessfulAuthentication() */
     }
 
+    //successfulAuthentication : méthode appelée si l'authentification a réussi, elle génère le JWT et l'ajoute dans l'en-tête de la réponse
     @Override
     protected void successfulAuthentication(HttpServletRequest request, HttpServletResponse response, FilterChain chain, Authentication authResult) throws IOException, ServletException {
         org.springframework.security.core.userdetails.User springUser = (org.springframework.security.core.userdetails.User) authResult.getPrincipal();
@@ -58,7 +63,7 @@ public class JWTAuthenticationFilter extends UsernamePasswordAuthenticationFilte
 
         springUser.getAuthorities().forEach(a -> {
             roles.add(a.getAuthority());
-        });
+        }); //on convertit les GrantedAuthority en simple List<String> pour les inclure dans le JWT
 
         String jwt = JWT.create().withSubject(springUser.getUsername())
                 .withArrayClaim("roles", roles.toArray(new String[roles.size()]))
@@ -66,10 +71,15 @@ public class JWTAuthenticationFilter extends UsernamePasswordAuthenticationFilte
                 .sign(Algorithm.HMAC256(SecParams.SECRET));
 
         response.addHeader("Authorization", SecParams.PREFIX + jwt);
+        //on ajoute le JWT dans l'en-tête Authorization de la réponse
+        //Ensuite, le front recupérera ce token pour le stocker (localStorage, sessionStorage, cookie) et l'envoyer dans l'en-tête Authorization des requêtes suivantes
     }
 
+    //unsuccessfulAuthentication : méthode appelée si l'authentification a échoué, elle gère le cas spécifique du compte désactivé
     @Override
     protected void unsuccessfulAuthentication(HttpServletRequest request, HttpServletResponse response, AuthenticationException failed) throws IOException, ServletException {
+        //ici on gère le cas où l'authentification a échoué parce que le compte n'est pas activé (DisabledException)
+        //Ca permet de renvoyer un message d'erreur plus explicite au front du style "votre compte n'est pas activé, veuillez vérifier votre email"
         if (failed instanceof DisabledException) {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             response.setContentType("application/json");
@@ -85,8 +95,16 @@ public class JWTAuthenticationFilter extends UsernamePasswordAuthenticationFilte
             writer.println(json);
             writer.flush();
         } else {
-            super.unsuccessfulAuthentication(request, response, failed);
+            super.unsuccessfulAuthentication(request, response, failed); //pour les autres cas d'échec (BadCredentialsException, etc.), on laisse la gestion par défaut de Spring Security
         }
     }
 
 }
+
+/*Cette classe :
+- intercepte la requête de login (par défaut sur /login avec la méthode POST et UsernamePasswordAuthenticationFilter)
+- lit le json envoyé dans le corps de la requête pour extraire les informations d'authentification (email et mot de passe)
+- demande à Spring Security de vérifier les identifiants via l'AuthenticationManager
+- si l'authentification réussit, génère un JWT avec les rôles de l'utilisateur et l'ajoute dans l'en-tête de la réponse Authorization
+- si l'authentification échoue parce que le compte est désactivé, renvoie une réponse JSON personnalisée avec un message d'erreur approprié
+*/
